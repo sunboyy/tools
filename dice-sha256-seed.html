@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dice → BIP39 Seed Phrase</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a323d;
+    --fg:#e6edf3; --muted:#8b949e; --accent:#f7931a; --accent2:#3fb950;
+    --warn:#d29922; --danger:#f85149; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       padding:24px 16px 64px}
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+           margin:0 0 12px;font-weight:600}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .spacer{flex:1}
+
+  /* dice */
+  .dice{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .die{aspect-ratio:1/1;min-height:64px;background:var(--panel2);border:1px solid var(--line);
+       border-radius:12px;color:var(--fg);font-size:28px;font-weight:600;cursor:pointer;
+       display:flex;align-items:center;justify-content:center;transition:.08s;font-family:var(--mono)}
+  .die:hover{border-color:var(--accent);background:#232c37}
+  .die:active,.die.flash{background:var(--accent);color:#111;border-color:var(--accent);transform:scale(.95)}
+  @media(max-width:560px){.dice{grid-template-columns:repeat(3,1fr)}}
+
+  button{font:inherit}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;
+       padding:7px 14px;cursor:pointer}
+  .btn:hover{border-color:var(--muted)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#111;font-weight:600}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* toggle */
+  .toggle{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px}
+  .toggle button{background:none;border:0;color:var(--muted);padding:7px 18px;border-radius:6px;
+                 cursor:pointer;font-weight:600}
+  .toggle button.on{background:var(--accent);color:#111}
+
+  .stat{display:flex;gap:24px;flex-wrap:wrap;margin-top:14px}
+  .stat div small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .stat div b{font-size:19px;font-family:var(--mono);font-weight:600}
+
+  .bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:12px}
+  .bar i{display:block;height:100%;background:var(--accent2);width:0;transition:width .15s}
+  .bar.low i{background:var(--warn)}
+
+  .hex{font-family:var(--mono);font-size:13px;word-break:break-all;background:var(--panel2);
+       border:1px solid var(--line);border-radius:8px;padding:10px;line-height:1.7}
+  .hex .used{color:var(--accent);font-weight:600}
+  .hex .unused{color:#5a636d}
+  .rolls{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all;
+         max-height:76px;overflow:auto;margin-top:12px}
+
+  .words{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:720px){.words{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:460px){.words{grid-template-columns:repeat(2,1fr)}}
+  .w{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+     display:flex;align-items:baseline;gap:8px}
+  .w span{color:var(--muted);font-size:11px;font-family:var(--mono);min-width:18px;text-align:right}
+  .w b{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:.01em}
+  .hidden .w b{filter:blur(6px);user-select:none}
+
+  .note{font-size:12.5px;color:var(--muted);margin-top:12px}
+  .warn{background:#2a220e;border:1px solid #57451a;color:#e3c46a;border-radius:8px;
+        padding:10px 12px;font-size:13px;margin-bottom:14px}
+  .dbox{background:#2b1416;border:1px solid #5c2327;color:#f2a8a8;border-radius:8px;
+        padding:10px 12px;font-size:13px;margin-bottom:12px}
+  .dbox code{color:#ffd5d5}
+  .okbox{background:#122419;border:1px solid #27502f;color:#7fd18f;border-radius:8px;
+         padding:10px 12px;font-size:13px;margin-bottom:12px}
+  /* the words themselves carry the warning state */
+  .words.weak .w{border-color:#57451a;background:#221d10}
+  .words.bad  .w{border-color:#5c2327;background:#241315}
+
+  /* derivation steps */
+  .step{border-left:2px solid var(--line);padding:0 0 0 14px;margin:0 0 18px;position:relative}
+  .step:last-child{margin-bottom:0}
+  .step h3{font-size:13px;margin:0 0 2px;font-weight:600}
+  .step h3 em{font-style:normal;color:var(--muted);font-weight:400}
+  .step p{margin:0 0 8px;font-size:12.5px;color:var(--muted)}
+  .step .hex{font-size:12.5px}
+  .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:5px;
+         padding:1px 7px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:6px}
+
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-family:var(--mono);font-size:12.5px}
+  th,td{text-align:left;padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  tbody tr:hover{background:var(--panel2)}
+  td.num{color:var(--muted)}
+  td.word{font-weight:600}
+  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+  .tblwrap table{margin:0}
+  .tblwrap tr:last-child td{border-bottom:0}
+
+  /* bit colouring: entropy vs checksum */
+  .bcs{color:var(--accent2);font-weight:700}
+  .legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+  .legend i{font-style:normal}
+  .legend .k{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:baseline}
+  .hidden .wcell{filter:blur(6px);user-select:none}
+  kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);
+      border-bottom-width:2px;border-radius:4px;padding:1px 5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎲 Dice → BIP39 Seed Phrase</h1>
+  <p class="sub">Dice entropy → SHA-256 → BIP-39. Fully offline &amp; self-contained:
+     save this file, disconnect from the network, open it in a browser.</p>
+
+  <div class="dbox" style="margin-bottom:14px">
+    <b>Disclaimer — use with caution.</b>
+    This page is an unofficial demonstration of the dice-roll seed generation method popularised by
+    hardware wallets. It is not affiliated with, endorsed by, or verified against any vendor or
+    device, and <b>nothing here is a recommendation of any particular hardware wallet</b> — check
+    the current security track record of any device yourself before trusting it with funds.
+    A web browser is not a secure environment for key material: the page, your OS, and anything
+    watching the screen or keyboard can see the result. For real funds, generate the seed on a
+    dedicated offline device you have independently vetted, and treat anything produced here as
+    untrusted and for learning only.
+  </div>
+
+  <div class="warn">
+    <b>Read first.</b> Use real, fair dice — not the keyboard, not a "random" thought.
+    Each roll is appended to the roll string and the whole string is re-hashed, so the phrase
+    changes with every entry. Anyone who sees your rolls can recreate this phrase.
+  </div>
+
+  <!-- ENTRY -->
+  <div class="card">
+    <h2>1 · Enter dice rolls</h2>
+    <div class="dice" id="dice"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="undo">↩ Undo</button>
+      <button class="btn" id="reset">Reset</button>
+      <span class="spacer"></span>
+      <span class="note" style="margin:0">Keys <kbd>1</kbd>–<kbd>6</kbd> · <kbd>⌫</kbd> undo</span>
+    </div>
+
+    <div class="stat">
+      <div><small>Rolls</small><b id="nrolls">0</b></div>
+      <div><small>Entropy collected</small><b id="ent">0.0 bits</b></div>
+      <div><small>Recommended</small><b id="need">50 rolls</b></div>
+    </div>
+    <div class="bar" id="bar"><i></i></div>
+    <div class="rolls" id="rolllist"></div>
+  </div>
+
+  <!-- HASH -->
+  <div class="card">
+    <h2>2 · SHA-256 (live)</h2>
+    <div class="hex" id="hash"></div>
+    <div class="note" id="hashnote"></div>
+  </div>
+
+  <!-- PHRASE -->
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <h2 style="margin:0">3 · Seed phrase</h2>
+      <span class="spacer"></span>
+      <div class="toggle" id="toggle">
+        <button data-n="12">12 words</button>
+        <button data-n="24" class="on">24 words</button>
+      </div>
+    </div>
+
+    <div id="phrasebox">
+      <div id="seedwarn"></div>
+      <div class="words" id="words"></div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="copy" disabled>Copy phrase</button>
+      <button class="btn" id="blur">Hide words</button>
+    </div>
+
+  </div>
+
+  <!-- DERIVATION -->
+  <div class="card" id="dcard">
+    <div class="row" style="margin-bottom:14px">
+      <h2 style="margin:0">4 · Derivation — how each word is produced</h2>
+      <span class="spacer"></span>
+      <button class="btn" id="dtoggle">Collapse</button>
+    </div>
+    <div id="details"></div>
+  </div>
+
+  <p class="note">
+    Derivation follows BIP-39: entropy → SHA-256 checksum (first ENT/32 bits) → 11-bit groups → English wordlist.
+    Verify the result on an offline tool you trust before funding any address.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- SHA-256 (self-contained, no Web Crypto needed) ---------- */
+const K = new Uint32Array([
+0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+
+const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+
+function sha256(msg) {                       // Uint8Array -> Uint8Array(32)
+  const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+                             0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const len = msg.length;
+  const total = ((((len + 8) >> 6) + 1) << 6);
+  const buf = new Uint8Array(total);
+  buf.set(msg);
+  buf[len] = 0x80;
+  const dv = new DataView(buf.buffer);
+  const bits = len * 8;
+  dv.setUint32(total - 8, Math.floor(bits / 4294967296));
+  dv.setUint32(total - 4, bits >>> 0);
+
+  const w = new Uint32Array(64);
+  for (let off = 0; off < total; off += 64) {
+    for (let t = 0; t < 16; t++) w[t] = dv.getUint32(off + t * 4);
+    for (let t = 16; t < 64; t++) {
+      const x = w[t - 15], y = w[t - 2];
+      const s0 = rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3);
+      const s1 = rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) >>> 0;
+    }
+    let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (let t = 0; t < 64; t++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K[t] + w[t]) >>> 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0]=(H[0]+a)>>>0; H[1]=(H[1]+b)>>>0; H[2]=(H[2]+c)>>>0; H[3]=(H[3]+d)>>>0;
+    H[4]=(H[4]+e)>>>0; H[5]=(H[5]+f)>>>0; H[6]=(H[6]+g)>>>0; H[7]=(H[7]+h)>>>0;
+  }
+  const out = new Uint8Array(32);
+  const odv = new DataView(out.buffer);
+  for (let i = 0; i < 8; i++) odv.setUint32(i * 4, H[i]);
+  return out;
+}
+
+const utf8      = s => new TextEncoder().encode(s);
+const toHex     = b => Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+const hexToBits = h => Array.from(h, c => parseInt(c, 16).toString(2).padStart(4, "0")).join("");
+const hexToBytes = h => { const o = new Uint8Array(h.length / 2);
+  for (let i = 0; i < o.length; i++) o[i] = parseInt(h.substr(i * 2, 2), 16); return o; };
+const sha256Hex = s => toHex(sha256(utf8(s)));
+
+/* ---------- BIP39 wordlist ---------- */
+const WORDS = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual adapt add addict address adjust admit adult advance advice aerobic affair afford afraid again age agent agree ahead aim air airport aisle alarm album alcohol alert alien all alley allow almost alone alpha already also alter always amateur amazing among amount amused analyst anchor ancient anger angle angry animal ankle announce annual another answer antenna antique anxiety any apart apology appear apple approve april arch arctic area arena argue arm armed armor army around arrange arrest arrive arrow art artefact artist artwork ask aspect assault asset assist assume asthma athlete atom attack attend attitude attract auction audit august aunt author auto autumn average avocado avoid awake aware away awesome awful awkward axis baby bachelor bacon badge bag balance balcony ball bamboo banana banner bar barely bargain barrel base basic basket battle beach bean beauty because become beef before begin behave behind believe below belt bench benefit best betray better between beyond bicycle bid bike bind biology bird birth bitter black blade blame blanket blast bleak bless blind blood blossom blouse blue blur blush board boat body boil bomb bone bonus book boost border boring borrow boss bottom bounce box boy bracket brain brand brass brave bread breeze brick bridge brief bright bring brisk broccoli broken bronze broom brother brown brush bubble buddy budget buffalo build bulb bulk bullet bundle bunker burden burger burst bus business busy butter buyer buzz cabbage cabin cable cactus cage cake call calm camera camp can canal cancel candy cannon canoe canvas canyon capable capital captain car carbon card cargo carpet carry cart case cash casino castle casual cat catalog catch category cattle caught cause caution cave ceiling celery cement census century cereal certain chair chalk champion change chaos chapter charge chase chat cheap check cheese chef cherry chest chicken chief child chimney choice choose chronic chuckle chunk churn cigar cinnamon circle citizen city civil claim clap clarify claw clay clean clerk clever click client cliff climb clinic clip clock clog close cloth cloud clown club clump cluster clutch coach coast coconut code coffee coil coin collect color column combine come comfort comic common company concert conduct confirm congress connect consider control convince cook cool copper copy coral core corn correct cost cotton couch country couple course cousin cover coyote crack cradle craft cram crane crash crater crawl crazy cream credit creek crew cricket crime crisp critic crop cross crouch crowd crucial cruel cruise crumble crunch crush cry crystal cube culture cup cupboard curious current curtain curve cushion custom cute cycle dad damage damp dance danger daring dash daughter dawn day deal debate debris decade december decide decline decorate decrease deer defense define defy degree delay deliver demand demise denial dentist deny depart depend deposit depth deputy derive describe desert design desk despair destroy detail detect develop device devote diagram dial diamond diary dice diesel diet differ digital dignity dilemma dinner dinosaur direct dirt disagree discover disease dish dismiss disorder display distance divert divide divorce dizzy doctor document dog doll dolphin domain donate donkey donor door dose double dove draft dragon drama drastic draw dream dress drift drill drink drip drive drop drum dry duck dumb dune during dust dutch duty dwarf dynamic eager eagle early earn earth easily east easy echo ecology economy edge edit educate effort egg eight either elbow elder electric elegant element elephant elevator elite else embark embody embrace emerge emotion employ empower empty enable enact end endless endorse enemy energy enforce engage engine enhance enjoy enlist enough enrich enroll ensure enter entire entry envelope episode equal equip era erase erode erosion error erupt escape essay essence estate eternal ethics evidence evil evoke evolve exact example excess exchange excite exclude excuse execute exercise exhaust exhibit exile exist exit exotic expand expect expire explain expose express extend extra eye eyebrow fabric face faculty fade faint faith fall false fame family famous fan fancy fantasy farm fashion fat fatal father fatigue fault favorite feature february federal fee feed feel female fence festival fetch fever few fiber fiction field figure file film filter final find fine finger finish fire firm first fiscal fish fit fitness fix flag flame flash flat flavor flee flight flip float flock floor flower fluid flush fly foam focus fog foil fold follow food foot force forest forget fork fortune forum forward fossil foster found fox fragile frame frequent fresh friend fringe frog front frost frown frozen fruit fuel fun funny furnace fury future gadget gain galaxy gallery game gap garage garbage garden garlic garment gas gasp gate gather gauge gaze general genius genre gentle genuine gesture ghost giant gift giggle ginger giraffe girl give glad glance glare glass glide glimpse globe gloom glory glove glow glue goat goddess gold good goose gorilla gospel gossip govern gown grab grace grain grant grape grass gravity great green grid grief grit grocery group grow grunt guard guess guide guilt guitar gun gym habit hair half hammer hamster hand happy harbor hard harsh harvest hat have hawk hazard head health heart heavy hedgehog height hello helmet help hen hero hidden high hill hint hip hire history hobby hockey hold hole holiday hollow home honey hood hope horn horror horse hospital host hotel hour hover hub huge human humble humor hundred hungry hunt hurdle hurry hurt husband hybrid ice icon idea identify idle ignore ill illegal illness image imitate immense immune impact impose improve impulse inch include income increase index indicate indoor industry infant inflict inform inhale inherit initial inject injury inmate inner innocent input inquiry insane insect inside inspire install intact interest into invest invite involve iron island isolate issue item ivory jacket jaguar jar jazz jealous jeans jelly jewel job join joke journey joy judge juice jump jungle junior junk just kangaroo keen keep ketchup key kick kid kidney kind kingdom kiss kit kitchen kite kitten kiwi knee knife knock know lab label labor ladder lady lake lamp language laptop large later latin laugh laundry lava law lawn lawsuit layer lazy leader leaf learn leave lecture left leg legal legend leisure lemon lend length lens leopard lesson letter level liar liberty library license life lift light like limb limit link lion liquid list little live lizard load loan lobster local lock logic lonely long loop lottery loud lounge love loyal lucky luggage lumber lunar lunch luxury lyrics machine mad magic magnet maid mail main major make mammal man manage mandate mango mansion manual maple marble march margin marine market marriage mask mass master match material math matrix matter maximum maze meadow mean measure meat mechanic medal media melody melt member memory mention menu mercy merge merit merry mesh message metal method middle midnight milk million mimic mind minimum minor minute miracle mirror misery miss mistake mix mixed mixture mobile model modify mom moment monitor monkey monster month moon moral more morning mosquito mother motion motor mountain mouse move movie much muffin mule multiply muscle museum mushroom music must mutual myself mystery myth naive name napkin narrow nasty nation nature near neck need negative neglect neither nephew nerve nest net network neutral never news next nice night noble noise nominee noodle normal north nose notable note nothing notice novel now nuclear number nurse nut oak obey object oblige obscure observe obtain obvious occur ocean october odor off offer office often oil okay old olive olympic omit once one onion online only open opera opinion oppose option orange orbit orchard order ordinary organ orient original orphan ostrich other outdoor outer output outside oval oven over own owner oxygen oyster ozone pact paddle page pair palace palm panda panel panic panther paper parade parent park parrot party pass patch path patient patrol pattern pause pave payment peace peanut pear peasant pelican pen penalty pencil people pepper perfect permit person pet phone photo phrase physical piano picnic picture piece pig pigeon pill pilot pink pioneer pipe pistol pitch pizza place planet plastic plate play please pledge pluck plug plunge poem poet point polar pole police pond pony pool popular portion position possible post potato pottery poverty powder power practice praise predict prefer prepare present pretty prevent price pride primary print priority prison private prize problem process produce profit program project promote proof property prosper protect proud provide public pudding pull pulp pulse pumpkin punch pupil puppy purchase purity purpose purse push put puzzle pyramid quality quantum quarter question quick quit quiz quote rabbit raccoon race rack radar radio rail rain raise rally ramp ranch random range rapid rare rate rather raven raw razor ready real reason rebel rebuild recall receive recipe record recycle reduce reflect reform refuse region regret regular reject relax release relief rely remain remember remind remove render renew rent reopen repair repeat replace report require rescue resemble resist resource response result retire retreat return reunion reveal review reward rhythm rib ribbon rice rich ride ridge rifle right rigid ring riot ripple risk ritual rival river road roast robot robust rocket romance roof rookie room rose rotate rough round route royal rubber rude rug rule run runway rural sad saddle sadness safe sail salad salmon salon salt salute same sample sand satisfy satoshi sauce sausage save say scale scan scare scatter scene scheme school science scissors scorpion scout scrap screen script scrub sea search season seat second secret section security seed seek segment select sell seminar senior sense sentence series service session settle setup seven shadow shaft shallow share shed shell sheriff shield shift shine ship shiver shock shoe shoot shop short shoulder shove shrimp shrug shuffle shy sibling sick side siege sight sign silent silk silly silver similar simple since sing siren sister situate six size skate sketch ski skill skin skirt skull slab slam sleep slender slice slide slight slim slogan slot slow slush small smart smile smoke smooth snack snake snap sniff snow soap soccer social sock soda soft solar soldier solid solution solve someone song soon sorry sort soul sound soup source south space spare spatial spawn speak special speed spell spend sphere spice spider spike spin spirit split spoil sponsor spoon sport spot spray spread spring spy square squeeze squirrel stable stadium staff stage stairs stamp stand start state stay steak steel stem step stereo stick still sting stock stomach stone stool story stove strategy street strike strong struggle student stuff stumble style subject submit subway success such sudden suffer sugar suggest suit summer sun sunny sunset super supply supreme sure surface surge surprise surround survey suspect sustain swallow swamp swap swarm swear sweet swift swim swing switch sword symbol symptom syrup system table tackle tag tail talent talk tank tape target task taste tattoo taxi teach team tell ten tenant tennis tent term test text thank that theme then theory there they thing this thought three thrive throw thumb thunder ticket tide tiger tilt timber time tiny tip tired tissue title toast tobacco today toddler toe together toilet token tomato tomorrow tone tongue tonight tool tooth top topic topple torch tornado tortoise toss total tourist toward tower town toy track trade traffic tragic train transfer trap trash travel tray treat tree trend trial tribe trick trigger trim trip trophy trouble truck true truly trumpet trust truth try tube tuition tumble tuna tunnel turkey turn turtle twelve twenty twice twin twist two type typical ugly umbrella unable unaware uncle uncover under undo unfair unfold unhappy uniform unique unit universe unknown unlock until unusual unveil update upgrade uphold upon upper upset urban urge usage use used useful useless usual utility vacant vacuum vague valid valley valve van vanish vapor various vast vault vehicle velvet vendor venture venue verb verify version very vessel veteran viable vibrant vicious victory video view village vintage violin virtual virus visa visit visual vital vivid vocal voice void volcano volume vote voyage wage wagon wait walk wall walnut want warfare warm warrior wash wasp waste water wave way wealth weapon wear weasel weather web wedding weekend weird welcome west wet whale what wheat wheel when where whip whisper wide width wife wild will win window wine wing wink winner winter wire wisdom wise wish witness wolf woman wonder wood wool word work world worry worth wrap wreck wrestle wrist write wrong yard year yellow you young youth zebra zero zone zoo".split(" ");
+
+/* ---------- state ---------- */
+const rolls = [];          // '1'..'6'
+let entry = "";            // the roll string, starts empty; each roll is appended
+let hash = "";             // SHA-256(entry), always valid — sha256("") when no rolls
+let wordCount = 24;
+let revealed = true;
+
+const $ = id => document.getElementById(id);
+const BITS_PER_ROLL = Math.log2(6);                        // 2.585 bits per d6
+const rollsFor = bits => Math.ceil(bits / BITS_PER_ROLL);  // 50 for 128, 100 for 256
+
+/* dice buttons */
+const diceEl = $("dice");
+for (let i = 1; i <= 6; i++) {
+  const b = document.createElement("button");
+  b.className = "die"; b.textContent = i; b.dataset.v = i;
+  b.addEventListener("click", () => addRoll(String(i)));
+  diceEl.appendChild(b);
+}
+
+function sync() {               // single source of truth: rolls -> entry -> hash -> UI
+  entry = rolls.join("");       // starts as the empty string
+  hash  = sha256Hex(entry);     // SHA-256 of every roll so far; sha256("") when none
+  render();
+}
+const addRoll = v => { rolls.push(v); sync(); };
+const undo    = ()  => { rolls.pop();  sync(); };
+const reset   = ()  => { rolls.length = 0; sync(); };
+
+$("undo").addEventListener("click", undo);
+$("reset").addEventListener("click", () => { if (!rolls.length || confirm("Discard all rolls?")) reset(); });
+
+document.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key >= "1" && e.key <= "6") {
+    addRoll(e.key);
+    const b = diceEl.querySelector(`[data-v="${e.key}"]`);
+    b.classList.add("flash"); setTimeout(() => b.classList.remove("flash"), 90);
+    e.preventDefault();
+  } else if (e.key === "Backspace") { undo(); e.preventDefault(); }
+});
+
+$("toggle").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-n]");
+  if (!btn) return;
+  wordCount = Number(btn.dataset.n);
+  for (const b of $("toggle").children) b.classList.toggle("on", b === btn);
+  render();
+});
+
+$("blur").addEventListener("click", () => {
+  revealed = !revealed;
+  $("blur").textContent = revealed ? "Hide words" : "Show words";
+  $("phrasebox").classList.toggle("hidden", !revealed);
+  $("dcard").classList.toggle("hidden", !revealed);   // don't leak words in the table
+});
+
+$("dtoggle").addEventListener("click", () => {
+  const open = $("details").style.display !== "none";
+  $("details").style.display = open ? "none" : "";
+  $("dtoggle").textContent = open ? "Expand" : "Collapse";
+});
+
+$("copy").addEventListener("click", async () => {
+  const phrase = buildPhrase().words.join(" ");
+  try { await navigator.clipboard.writeText(phrase); }
+  catch (_) {
+    const t = document.createElement("textarea");
+    t.value = phrase; document.body.appendChild(t); t.select();
+    document.execCommand("copy"); t.remove();
+  }
+  $("copy").textContent = "Copied ✓";
+  setTimeout(() => ($("copy").textContent = "Copy phrase"), 1200);
+});
+
+/* ---------- BIP39 derivation ---------- */
+function buildPhrase() {
+  const entBits  = wordCount === 12 ? 128 : 256;
+  const entHex   = hash.slice(0, entBits / 4);          // 12 words -> first 128 bits
+  const bits     = hexToBits(entHex);
+  const csLen    = entBits / 32;                        // 4 or 8 bits
+  const csHex    = toHex(sha256(hexToBytes(entHex)));   // SHA-256 over the entropy BYTES
+  const csBits   = hexToBits(csHex).slice(0, csLen);
+  const all      = bits + csBits;
+
+  const idx = [], chunks = [];
+  for (let i = 0; i < all.length; i += 11) {
+    const c = all.slice(i, i + 11);
+    chunks.push(c);
+    idx.push(parseInt(c, 2));
+  }
+  return { entBits, entHex, bits, csHex, csBits, csLen, all, chunks, idx,
+           words: idx.map(i => WORDS[i]) };
+}
+
+/* ---------- render ---------- */
+function render() {
+  const n = rolls.length;
+  const entBits = wordCount === 12 ? 128 : 256;
+  const need = rollsFor(entBits);
+  const have = n * BITS_PER_ROLL;
+
+  $("nrolls").textContent = n;
+  $("ent").textContent = have.toFixed(1) + " bits";
+  $("need").textContent = need + " rolls";
+
+  const pct = Math.min(100, (n / need) * 100);
+  $("bar").querySelector("i").style.width = pct + "%";
+  $("bar").classList.toggle("low", pct < 100);
+  $("rolllist").textContent = entry;   // exactly the string being hashed
+
+  /* live hash, with the slice actually used highlighted */
+  const cut = entBits / 4;
+  $("hash").innerHTML = '<span class="used">' + hash.slice(0, cut) + "</span>" +
+    (cut < 64 ? '<span class="unused">' + hash.slice(cut) + "</span>" : "");
+  $("hashnote").innerHTML =
+    `<code>SHA-256("${entry.length > 60 ? entry.slice(0, 30) + "…" + entry.slice(-20) : entry}")</code> — ` +
+    `highlighted = the <b>first ${entBits} bits</b> used as entropy for ${wordCount} words.`;
+
+  /* words + entropy warning, always shown until the condition is met */
+  const wordsEl = $("words");
+  wordsEl.innerHTML = "";
+  wordsEl.className = "words" + (n === 0 ? " bad" : n < need ? " weak" : "");
+  $("copy").disabled = n === 0;
+  renderWarning(n, need, have, entBits);
+
+  const p = buildPhrase();
+  p.words.forEach((w, i) => {
+    const d = document.createElement("div");
+    d.className = "w";
+    d.innerHTML = `<span>${i + 1}</span><b></b>`;
+    d.querySelector("b").textContent = w;
+    wordsEl.appendChild(d);
+  });
+
+  renderDetails(p);
+}
+
+/* Warning shown on the phrase itself whenever the entropy condition is not met.
+   A 24-word phrase encodes 256 bits, so ~50 rolls (129 bits) leaves it half-filled
+   even though the phrase is perfectly valid. */
+function renderWarning(n, need, have, entBits) {
+  const el = $("seedwarn");
+
+  if (n === 0) {
+    el.className = "dbox";
+    el.innerHTML = `<b>Do not use this phrase.</b> With no rolls it is <code>SHA-256("")</code>, ` +
+      `a constant everyone knows — so this phrase is public. Roll the dice to make it yours.`;
+    return;
+  }
+
+  if (n < need) {
+    const real = Math.round(Math.min(have, entBits));
+    el.className = "warn";
+    el.innerHTML =
+      `<b>⚠ Entropy not fully utilized — ${n} of ${need} rolls.</b><br>` +
+      `These ${wordCount} words encode <b>${entBits} bits</b>, but your rolls supply only about ` +
+      `<b>${real} bits</b> of real randomness. The phrase is valid and restores in any wallet; ` +
+      `its true strength is just ${real} bits. ` +
+      `Roll <b>${need - n} more</b> to reach the full ${entBits} bits.`;
+    return;
+  }
+
+  el.className = "okbox";
+  el.innerHTML = `<b>✓ Entropy condition met.</b> ${n} rolls ≈ ${Math.round(have)} bits, ` +
+    `saturating all ${entBits} bits of this ${wordCount}-word phrase.`;
+}
+
+/* colour checksum bits differently from entropy bits */
+function paintBits(chunk, startBit, entBits) {
+  return Array.from(chunk, (b, j) =>
+    startBit + j >= entBits ? `<span class="bcs">${b}</span>` : b).join("");
+}
+
+function renderDetails(p) {
+  const csCut = p.csLen / 4;                 // hex chars covering the checksum bits
+  const rows = p.chunks.map((c, i) => {
+    const start = i * 11;
+    return `<tr><td class="num">${i + 1}</td>` +
+           `<td>${paintBits(c, start, p.entBits)}</td>` +
+           `<td class="num">${p.idx[i]}</td>` +
+           `<td class="word wcell">${p.words[i]}</td></tr>`;
+  }).join("");
+
+  $("details").innerHTML = `
+    <div class="step">
+      <h3>a · Entropy <em>— first ${p.entBits} bits of the SHA-256 sum</em>
+        <span class="badge">${p.entBits} bits = ${p.entHex.length} hex chars</span></h3>
+      <p>${p.entBits === 128
+            ? "12 words uses only the first half of the 256-bit sum."
+            : "24 words uses the whole 256-bit sum."}</p>
+      <div class="hex"><span class="used">${p.entHex}</span></div>
+    </div>
+
+    <div class="step">
+      <h3>b · Checksum <em>— first ${p.csLen} bits of SHA-256(entropy bytes)</em>
+        <span class="badge">${p.csLen} bits</span></h3>
+      <p>Hashed over the raw ${p.entBits / 8} entropy bytes, not the hex text.</p>
+      <div class="hex"><span class="used">${p.csHex.slice(0, csCut)}</span><span class="unused">${p.csHex.slice(csCut)}</span></div>
+      <p style="margin-top:8px">First ${p.csLen} bits → <code class="bcs">${p.csBits}</code>, appended to the entropy.</p>
+    </div>
+
+    <div class="step">
+      <h3>c · Split into 11-bit groups <em>— each group is one word index (0–2047)</em>
+        <span class="badge">${p.entBits} + ${p.csLen} = ${p.all.length} bits ÷ 11 = ${p.chunks.length} words</span></h3>
+      <div class="tblwrap"><table>
+        <thead><tr><th>#</th><th>11-bit group</th><th>Index</th><th>Word</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div class="legend">
+        <i><span class="k" style="background:var(--fg)"></span>entropy bits</i>
+        <i><span class="k" style="background:var(--accent2)"></span>checksum bits</i>
+        <i>Word index → <code>BIP39_wordlist[index]</code> (2048 English words)</i>
+      </div>
+    </div>`;
+}
+
+/* sanity: wordlist must be exactly 2048 entries */
+if (WORDS.length !== 2048) {
+  document.body.insertAdjacentHTML("afterbegin",
+    `<div class="warn" style="max-width:920px;margin:0 auto 16px">Wordlist error: ${WORDS.length} words loaded, expected 2048.</div>`);
+}
+sync();
+</script>
+</body>
+</html>
