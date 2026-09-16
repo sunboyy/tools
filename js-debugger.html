@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>In-Page JS Console</title>
+        <!-- Load Tailwind CSS -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            /* Set font to Inter */
+            html {
+                font-family: 'Inter', sans-serif;
+            }
+
+            /* Custom scrollbar for the output area */
+            .output-area::-webkit-scrollbar {
+                width: 8px;
+            }
+            .output-area::-webkit-scrollbar-thumb {
+                background-color: #4b5563; /* Gray-600 */
+                border-radius: 4px;
+            }
+            .output-area::-webkit-scrollbar-track {
+                background-color: #1f2937; /* Gray-800 */
+            }
+        </style>
+    </head>
+    <body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 flex flex-col items-center">
+        <div class="w-full max-w-4xl">
+            <h1 class="text-3xl sm:text-4xl font-extrabold mb-6 text-indigo-400 text-center">
+                In-Page JS Console
+            </h1>
+            <p class="text-center text-gray-400 mb-8">
+                Type your JavaScript code below and press "Run" to see the output.
+            </p>
+
+            <!-- Code Input Area -->
+            <div class="mb-6">
+                <label for="codeInput" class="block text-lg font-medium mb-2 text-gray-300">
+                    Enter Code:
+                </label>
+                <textarea
+                    id="codeInput"
+                    rows="10"
+                    class="w-full p-4 bg-gray-800 border-2 border-gray-700 rounded-lg focus:border-indigo-500 focus:ring-indigo-500 outline-none transition duration-150 ease-in-out text-sm font-mono resize-none"
+                    placeholder="Enter your JavaScript code here. E.g., console.log('Hello'); 1 + 2 * 3;"
+                ></textarea>
+            </div>
+
+            <!-- Run Button -->
+            <div class="flex justify-center mb-8">
+                <button
+                    id="runButton"
+                    onclick="runCode()"
+                    class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-full shadow-lg transition duration-150 ease-in-out transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50"
+                >
+                    Run Code (Ctrl/Cmd + Enter)
+                </button>
+            </div>
+
+            <!-- Output Area -->
+            <div class="mt-6">
+                <h2 class="text-xl font-medium mb-3 text-gray-300">Output:</h2>
+                <pre
+                    id="outputArea"
+                    class="output-area p-4 bg-gray-800 border-2 border-gray-700 rounded-lg text-sm whitespace-pre-wrap max-h-80 overflow-y-auto"
+                ></pre>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            // Helper to format output for display
+            const formatOutput = (value) => {
+                if (typeof value === 'object' && value !== null) {
+                    try {
+                        // Try to stringify complex objects for better readability
+                        return JSON.stringify(
+                            value,
+                            (key, val) => (typeof val === 'bigint' ? val.toString() + 'n' : val),
+                            2,
+                        )
+                    } catch (e) {
+                        // Fallback for circular references
+                        return String(value)
+                    }
+                } else if (typeof value === 'undefined') {
+                    return 'undefined'
+                } else if (typeof value === 'function') {
+                    return value.toString()
+                } else if (typeof value === 'symbol') {
+                    return value.toString()
+                } else {
+                    return String(value)
+                }
+            }
+
+            const runCode = () => {
+                const codeInput = document.getElementById('codeInput')
+                const outputArea = document.getElementById('outputArea')
+                const code = codeInput.value
+
+                // 1. Array to capture all 'console.log' output
+                let capturedLogs = []
+
+                // 2. Temporarily hijack console.log
+                const originalConsoleLog = console.log
+                console.log = (...args) => {
+                    const logMessage = args.map((arg) => formatOutput(arg)).join(' ')
+                    capturedLogs.push({ type: 'log', message: logMessage })
+                    // We don't call the original log here to keep the dev console clean, but we capture the intent.
+                }
+
+                let finalResult = null
+                let errorOccurred = false
+
+                try {
+                    // 3. Execute the code
+                    // Using eval() is necessary for this type of console/interpreter functionality.
+                    // It is contained within the try/catch for error handling.
+                    finalResult = eval(code)
+
+                    if (finalResult !== undefined) {
+                        capturedLogs.push({ type: 'result', message: formatOutput(finalResult) })
+                    }
+                } catch (error) {
+                    errorOccurred = true
+                    capturedLogs.push({ type: 'error', message: formatOutput(error) })
+                } finally {
+                    // 4. Restore the original console.log (CRITICAL STEP)
+                    console.log = originalConsoleLog
+                }
+
+                // 5. Display the combined output
+                let outputHTML = ''
+
+                if (capturedLogs.length === 0) {
+                    outputHTML = `<span class="text-gray-400">Code executed successfully, but returned no value and logged nothing.</span>`
+                } else {
+                    capturedLogs.forEach((entry) => {
+                        let className = 'text-gray-300'
+                        let label = ''
+
+                        switch (entry.type) {
+                            case 'log':
+                                className = 'text-green-400'
+                                label = 'LOG: '
+                                break
+                            case 'result':
+                                className = 'text-indigo-300 font-bold'
+                                label = 'RETURN VALUE: '
+                                break
+                            case 'error':
+                                className = 'text-red-400'
+                                label = 'ERROR: '
+                                break
+                        }
+
+                        // Pre-format the message for the <pre> block
+                        outputHTML += `<span class="${className}">${label}${entry.message}</span>\n\n`
+                    })
+                }
+
+                // Remove trailing newlines for a cleaner look
+                outputArea.innerHTML = outputHTML.trim()
+            }
+
+            // Add keyboard shortcut: Ctrl/Cmd + Enter
+            document.getElementById('codeInput').addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault() // Prevent new line in textarea
+                    runCode()
+                }
+            })
+
+            // Initialize with the sample code
+            window.onload = runCode
+        </script>
+    </body>
+</html>
