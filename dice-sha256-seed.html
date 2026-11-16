@@ -3,201 +3,217 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dice → BIP39 Seed Phrase</title>
+<title>Dice to BIP39 seed phrase</title>
 <style>
   :root{
-    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a323d;
-    --fg:#e6edf3; --muted:#8b949e; --accent:#f7931a; --accent2:#3fb950;
-    --warn:#d29922; --danger:#f85149; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --paper:#edf2e1; --grid:#dbe6cc; --grid-major:#c6d7b3; --sheet:#f8faf1;
+    --ink:#1b2a22; --soft:#56675b; --rule:#9fb38f;
+    --die:#c4262e; --die-edge:#8e1820; --pip:#fff6ea;
+    --pencil:#2b4ba6; --amber:#8a5a00; --amber-bg:#f6ebc6; --red-bg:#f7dcd8; --ok:#1f6b3a; --ok-bg:#dcedd3;
+    --display:"DIN Condensed","Avenir Next Condensed","Bahnschrift","Roboto Condensed","Arial Narrow",sans-serif;
+    --text:"Avenir Next","Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#141d18; --grid:#1b2720; --grid-major:#24332a; --sheet:#1a251f;
+      --ink:#e3ebdc; --soft:#9aab9d; --rule:#3d5245;
+      --die:#cf2f37; --die-edge:#7d141b;
+      --pencil:#93acff; --amber:#e8bd5a; --amber-bg:#33290f; --red-bg:#3a1b1b; --ok:#84d39b; --ok-bg:#173022;
+    }
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);
-       font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-       padding:24px 16px 64px}
-  .wrap{max-width:920px;margin:0 auto}
-  h1{font-size:20px;margin:0 0 4px}
-  .sub{color:var(--muted);font-size:13px;margin:0 0 20px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
-  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
-           margin:0 0 12px;font-weight:600}
-  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-  .spacer{flex:1}
+  body{margin:0;color:var(--ink);font:16px/1.5 var(--text);padding:32px 16px 72px;
+       background-color:var(--paper);
+       background-image:
+         linear-gradient(var(--grid-major) 1px,transparent 1px),
+         linear-gradient(90deg,var(--grid-major) 1px,transparent 1px),
+         linear-gradient(var(--grid) 1px,transparent 1px),
+         linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+       background-size:80px 80px,80px 80px,16px 16px,16px 16px}
+  .wrap{max-width:1080px;margin:0 auto}
 
-  /* dice */
-  .dice{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-  .die{aspect-ratio:1/1;min-height:64px;background:var(--panel2);border:1px solid var(--line);
-       border-radius:12px;color:var(--fg);font-size:28px;font-weight:600;cursor:pointer;
-       display:flex;align-items:center;justify-content:center;transition:.08s;font-family:var(--mono)}
-  .die:hover{border-color:var(--accent);background:#232c37}
-  .die:active,.die.flash{background:var(--accent);color:#111;border-color:var(--accent);transform:scale(.95)}
-  @media(max-width:560px){.dice{grid-template-columns:repeat(3,1fr)}}
+  header{margin-bottom:24px}
+  h1{font:700 clamp(40px,7vw,64px)/.95 var(--display);font-stretch:condensed;letter-spacing:.01em;margin:0 0 8px}
+  .sub{margin:0;max-width:62ch;color:var(--soft)}
 
-  button{font:inherit}
-  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;
-       padding:7px 14px;cursor:pointer}
-  .btn:hover{border-color:var(--muted)}
-  .btn.primary{background:var(--accent);border-color:var(--accent);color:#111;font-weight:600}
+  .notes{display:grid;gap:16px;margin-bottom:32px}
+  .notice{background:var(--sheet);border-left:4px solid var(--rule);padding:12px 16px;font-size:14px;margin:0}
+  .notice.is-danger{border-color:var(--die);background:var(--red-bg)}
+  .notice.is-weak{border-color:var(--amber);background:var(--amber-bg)}
+  .notice.is-ok{border-color:var(--ok);background:var(--ok-bg)}
+  .notice code{font-family:var(--mono);font-size:.92em}
+
+  .layout{display:grid;gap:40px}
+  @media(min-width:880px){
+    .notes{grid-template-columns:3fr 2fr;align-items:start}
+    .layout{grid-template-columns:320px minmax(0,1fr);gap:48px;align-items:start}
+  }
+  @media(min-width:880px) and (min-height:820px){.pad{position:sticky;top:16px}}
+
+  h2{font:700 26px/1.1 var(--display);font-stretch:condensed;letter-spacing:.01em;margin:0}
+  h2 .n{display:inline-block;min-width:1.3em;color:var(--die)}
+  .head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+        border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:16px}
+  .calc section + section{margin-top:44px}
+
+  .dice{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .die{aspect-ratio:1/1;padding:0;border:0;border-radius:18%;background:var(--die);cursor:pointer;
+       box-shadow:inset 0 -7px 0 var(--die-edge),inset 0 2px 0 rgba(255,255,255,.28);
+       transition:transform .06s,box-shadow .06s}
+  .die svg{display:block;width:100%;height:100%}
+  .die circle{fill:var(--pip)}
+  .die:active,.die.flash{transform:translateY(4px);
+       box-shadow:inset 0 -3px 0 var(--die-edge),inset 0 2px 0 rgba(255,255,255,.28)}
+  @media(max-width:879px){.dice{grid-template-columns:repeat(6,1fr);gap:8px}}
+  @media(max-width:520px){.dice{grid-template-columns:repeat(3,1fr);gap:12px;max-width:340px}}
+
+  button{font:inherit;color:inherit}
+  :focus-visible{outline:3px solid var(--pencil);outline-offset:2px}
+  .btn{background:var(--sheet);border:1.5px solid var(--ink);border-radius:4px;padding:6px 14px;
+       cursor:pointer;font-weight:600;font-size:14px}
+  .btn:hover:not(:disabled){background:var(--ink);color:var(--paper)}
   .btn:disabled{opacity:.4;cursor:not-allowed}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .keys{margin-left:auto;font-size:13px;color:var(--soft)}
+  kbd{font:600 12px var(--mono);background:var(--sheet);border:1px solid var(--rule);border-bottom-width:2px;
+      border-radius:3px;padding:1px 5px}
 
-  /* toggle */
-  .toggle{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px}
-  .toggle button{background:none;border:0;color:var(--muted);padding:7px 18px;border-radius:6px;
-                 cursor:pointer;font-weight:600}
-  .toggle button.on{background:var(--accent);color:#111}
+  .counts{display:flex;gap:24px;margin:20px 0 10px;font-size:14px;color:var(--soft)}
+  .counts p{margin:0}
+  .counts b{font:700 30px/1 var(--display);font-stretch:condensed;color:var(--ink);margin-right:2px}
 
-  .stat{display:flex;gap:24px;flex-wrap:wrap;margin-top:14px}
-  .stat div small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-  .stat div b{font-size:19px;font-family:var(--mono);font-weight:600}
+  .tally{display:grid;grid-template-columns:repeat(10,1fr);background:var(--sheet);
+         border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+  .tally i{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font:600 14px var(--mono);
+           font-style:normal;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+  .tally i.last{background:var(--ink);color:var(--paper)}
+  .tally i.extra{color:var(--soft)}
 
-  .bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:12px}
-  .bar i{display:block;height:100%;background:var(--accent2);width:0;transition:width .15s}
-  .bar.low i{background:var(--warn)}
+  .seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden}
+  .seg button{background:var(--sheet);border:0;padding:5px 14px;cursor:pointer;font-weight:600;font-size:14px}
+  .seg button.on{background:var(--ink);color:var(--paper)}
 
-  .hex{font-family:var(--mono);font-size:13px;word-break:break-all;background:var(--panel2);
-       border:1px solid var(--line);border-radius:8px;padding:10px;line-height:1.7}
-  .hex .used{color:var(--accent);font-weight:600}
-  .hex .unused{color:#5a636d}
-  .rolls{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all;
-         max-height:76px;overflow:auto;margin-top:12px}
+  .hex{font:13.5px/1.7 var(--mono);word-break:break-all;background:var(--sheet);
+       border:1px solid var(--rule);padding:10px 12px}
+  .hex .used{font-weight:700}
+  .hex .unused{color:var(--soft);opacity:.65}
+  .note{font-size:13.5px;color:var(--soft);margin:10px 0 0}
+  .note code,.step code{font-family:var(--mono);font-size:.94em}
 
-  .words{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  @media(max-width:720px){.words{grid-template-columns:repeat(3,1fr)}}
-  @media(max-width:460px){.words{grid-template-columns:repeat(2,1fr)}}
-  .w{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
-     display:flex;align-items:baseline;gap:8px}
-  .w span{color:var(--muted);font-size:11px;font-family:var(--mono);min-width:18px;text-align:right}
-  .w b{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:.01em}
-  .hidden .w b{filter:blur(6px);user-select:none}
+  .words{list-style:none;margin:16px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px 24px}
+  @media(max-width:1000px){.words{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:460px){.words{grid-template-columns:repeat(2,1fr);gap:4px 16px}}
+  .w{display:flex;align-items:baseline;gap:8px;border-bottom:1.5px solid var(--ink);padding:8px 0 4px}
+  .w span{font:700 15px var(--display);font-stretch:condensed;color:var(--soft);min-width:1.4em}
+  .w b{font:600 16px var(--mono)}
+  .words.weak .w{border-bottom-color:var(--amber)}
+  .words.bad .w{border-bottom-color:var(--die)}
+  .words.bad .w b{color:var(--die);text-decoration:line-through}
+  .hidden .w b,.hidden .wcell{filter:blur(6px);user-select:none}
 
-  .note{font-size:12.5px;color:var(--muted);margin-top:12px}
-  .warn{background:#2a220e;border:1px solid #57451a;color:#e3c46a;border-radius:8px;
-        padding:10px 12px;font-size:13px;margin-bottom:14px}
-  .dbox{background:#2b1416;border:1px solid #5c2327;color:#f2a8a8;border-radius:8px;
-        padding:10px 12px;font-size:13px;margin-bottom:12px}
-  .dbox code{color:#ffd5d5}
-  .okbox{background:#122419;border:1px solid #27502f;color:#7fd18f;border-radius:8px;
-         padding:10px 12px;font-size:13px;margin-bottom:12px}
-  /* the words themselves carry the warning state */
-  .words.weak .w{border-color:#57451a;background:#221d10}
-  .words.bad  .w{border-color:#5c2327;background:#241315}
-
-  /* derivation steps */
-  .step{border-left:2px solid var(--line);padding:0 0 0 14px;margin:0 0 18px;position:relative}
+  .step{margin:0 0 28px}
   .step:last-child{margin-bottom:0}
-  .step h3{font-size:13px;margin:0 0 2px;font-weight:600}
-  .step h3 em{font-style:normal;color:var(--muted);font-weight:400}
-  .step p{margin:0 0 8px;font-size:12.5px;color:var(--muted)}
-  .step .hex{font-size:12.5px}
-  .badge{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:5px;
-         padding:1px 7px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:6px}
+  h3{font:700 16px/1.3 var(--text);margin:0 0 2px}
+  .step p{margin:0 0 8px;font-size:14px;color:var(--soft);max-width:70ch}
+  .sum{font:13px var(--mono);color:var(--soft)}
+  .bcs{color:var(--pencil);font-weight:700}
 
-  table{width:100%;border-collapse:collapse;margin-top:8px;font-family:var(--mono);font-size:12.5px}
-  th,td{text-align:left;padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
-  tbody tr:hover{background:var(--panel2)}
-  td.num{color:var(--muted)}
-  td.word{font-weight:600}
-  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
-  .tblwrap table{margin:0}
-  .tblwrap tr:last-child td{border-bottom:0}
+  .tblwrap{overflow-x:auto;background:var(--sheet);border:1px solid var(--rule)}
+  table{width:100%;border-collapse:collapse;font:13.5px var(--mono)}
+  th,td{text-align:left;padding:5px 12px;border-bottom:1px solid var(--grid-major);white-space:nowrap}
+  th{font:600 13px var(--text);color:var(--soft);border-bottom-color:var(--rule)}
+  tr:last-child td{border-bottom:0}
+  td.num{color:var(--soft)}
+  td.word{font-weight:700}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--soft);margin-top:10px}
+  .legend .k{display:inline-block;width:10px;height:10px;margin-right:6px}
 
-  /* bit colouring: entropy vs checksum */
-  .bcs{color:var(--accent2);font-weight:700}
-  .legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
-  .legend i{font-style:normal}
-  .legend .k{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:baseline}
-  .hidden .wcell{filter:blur(6px);user-select:none}
-  kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);
-      border-bottom-width:2px;border-radius:4px;padding:1px 5px}
+  .foot{margin:48px 0 0;font-size:13.5px;color:var(--soft);max-width:75ch}
+  @media(prefers-reduced-motion:reduce){.die{transition:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🎲 Dice → BIP39 Seed Phrase</h1>
-  <p class="sub">Dice entropy → SHA-256 → BIP-39. Fully offline &amp; self-contained:
-     save this file, disconnect from the network, open it in a browser.</p>
+  <header>
+    <h1>Dice to seed phrase</h1>
+    <p class="sub">Roll real dice, hash the rolls with SHA-256, and read the result as a BIP-39 phrase.
+      Nothing leaves this file: save it, disconnect from the network, then open it in a browser.</p>
+  </header>
 
-  <div class="dbox" style="margin-bottom:14px">
-    <b>Disclaimer — use with caution.</b>
-    This page is an unofficial demonstration of the dice-roll seed generation method popularised by
-    hardware wallets. It is not affiliated with, endorsed by, or verified against any vendor or
-    device, and <b>nothing here is a recommendation of any particular hardware wallet</b> — check
-    the current security track record of any device yourself before trusting it with funds.
-    A web browser is not a secure environment for key material: the page, your OS, and anything
-    watching the screen or keyboard can see the result. For real funds, generate the seed on a
-    dedicated offline device you have independently vetted, and treat anything produced here as
-    untrusted and for learning only.
+  <div class="notes">
+    <p class="notice is-danger">
+      <b>Disclaimer: use with caution.</b>
+      This page is an unofficial demonstration of the dice-roll seed generation method popularised by
+      hardware wallets. It is not affiliated with, endorsed by, or verified against any vendor or
+      device, and <b>nothing here is a recommendation of any particular hardware wallet</b>. Check
+      the current security track record of any device yourself before trusting it with funds.
+      A web browser is not a secure environment for key material: the page, your OS, and anything
+      watching the screen or keyboard can see the result. For real funds, generate the seed on a
+      dedicated offline device you have independently vetted, and treat anything produced here as
+      untrusted and for learning only.
+    </p>
+    <p class="notice is-weak">
+      <b>Read first.</b> Use real, fair dice, not the keyboard and not a "random" thought.
+      Each roll is appended to the roll string and the whole string is re-hashed, so the phrase
+      changes with every entry. Anyone who sees your rolls can recreate this phrase.
+    </p>
   </div>
 
-  <div class="warn">
-    <b>Read first.</b> Use real, fair dice — not the keyboard, not a "random" thought.
-    Each roll is appended to the roll string and the whole string is re-hashed, so the phrase
-    changes with every entry. Anyone who sees your rolls can recreate this phrase.
-  </div>
-
-  <!-- ENTRY -->
-  <div class="card">
-    <h2>1 · Enter dice rolls</h2>
-    <div class="dice" id="dice"></div>
-    <div class="row" style="margin-top:12px">
-      <button class="btn" id="undo">↩ Undo</button>
-      <button class="btn" id="reset">Reset</button>
-      <span class="spacer"></span>
-      <span class="note" style="margin:0">Keys <kbd>1</kbd>–<kbd>6</kbd> · <kbd>⌫</kbd> undo</span>
-    </div>
-
-    <div class="stat">
-      <div><small>Rolls</small><b id="nrolls">0</b></div>
-      <div><small>Entropy collected</small><b id="ent">0.0 bits</b></div>
-      <div><small>Recommended</small><b id="need">50 rolls</b></div>
-    </div>
-    <div class="bar" id="bar"><i></i></div>
-    <div class="rolls" id="rolllist"></div>
-  </div>
-
-  <!-- HASH -->
-  <div class="card">
-    <h2>2 · SHA-256 (live)</h2>
-    <div class="hex" id="hash"></div>
-    <div class="note" id="hashnote"></div>
-  </div>
-
-  <!-- PHRASE -->
-  <div class="card">
-    <div class="row" style="margin-bottom:12px">
-      <h2 style="margin:0">3 · Seed phrase</h2>
-      <span class="spacer"></span>
-      <div class="toggle" id="toggle">
-        <button data-n="12">12 words</button>
-        <button data-n="24" class="on">24 words</button>
+  <div class="layout">
+    <section class="pad" aria-labelledby="h-rolls">
+      <div class="head"><h2 id="h-rolls"><span class="n">1</span>Enter each roll</h2></div>
+      <div class="dice" id="dice"></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" id="undo">Undo</button>
+        <button class="btn" id="reset">Reset</button>
+        <span class="keys"><kbd>1</kbd> to <kbd>6</kbd>, <kbd>⌫</kbd> undoes</span>
       </div>
-    </div>
+      <div class="counts">
+        <p><b id="nrolls">0</b>of <span id="need">100</span> rolls</p>
+        <p><b id="ent">0.0</b>of <span id="entneed">256</span> bits</p>
+      </div>
+      <div class="tally" id="tally" aria-label="Rolls entered so far"></div>
+    </section>
 
-    <div id="phrasebox">
-      <div id="seedwarn"></div>
-      <div class="words" id="words"></div>
-    </div>
+    <div class="calc">
+      <section aria-labelledby="h-hash">
+        <div class="head"><h2 id="h-hash"><span class="n">2</span>SHA-256 of your rolls</h2></div>
+        <div class="hex" id="hash"></div>
+        <p class="note" id="hashnote"></p>
+      </section>
 
-    <div class="row" style="margin-top:14px">
-      <button class="btn" id="copy" disabled>Copy phrase</button>
-      <button class="btn" id="blur">Hide words</button>
-    </div>
+      <section aria-labelledby="h-phrase">
+        <div class="head">
+          <h2 id="h-phrase"><span class="n">3</span>Seed phrase</h2>
+          <div class="seg" id="toggle">
+            <button data-n="12">12 words</button>
+            <button data-n="24" class="on">24 words</button>
+          </div>
+        </div>
+        <div id="phrasebox">
+          <p class="notice" id="seedwarn"></p>
+          <ol class="words" id="words"></ol>
+        </div>
+        <div class="row" style="margin-top:20px">
+          <button class="btn" id="copy" disabled>Copy phrase</button>
+          <button class="btn" id="blur">Hide words</button>
+        </div>
+      </section>
 
+      <section id="dcard" aria-labelledby="h-deriv">
+        <div class="head">
+          <h2 id="h-deriv"><span class="n">4</span>How each word is produced</h2>
+          <button class="btn" id="dtoggle">Collapse</button>
+        </div>
+        <div id="details"></div>
+      </section>
+    </div>
   </div>
 
-  <!-- DERIVATION -->
-  <div class="card" id="dcard">
-    <div class="row" style="margin-bottom:14px">
-      <h2 style="margin:0">4 · Derivation — how each word is produced</h2>
-      <span class="spacer"></span>
-      <button class="btn" id="dtoggle">Collapse</button>
-    </div>
-    <div id="details"></div>
-  </div>
-
-  <p class="note">
-    Derivation follows BIP-39: entropy → SHA-256 checksum (first ENT/32 bits) → 11-bit groups → English wordlist.
-    Verify the result on an offline tool you trust before funding any address.
+  <p class="foot">
+    Derivation follows BIP-39: entropy, then a SHA-256 checksum (first ENT/32 bits), then 11-bit groups
+    looked up in the English wordlist. Verify the result on an offline tool you trust before funding any address.
   </p>
 </div>
 
@@ -280,11 +296,13 @@ const $ = id => document.getElementById(id);
 const BITS_PER_ROLL = Math.log2(6);                        // 2.585 bits per d6
 const rollsFor = bits => Math.ceil(bits / BITS_PER_ROLL);  // 50 for 128, 100 for 256
 
-/* dice buttons */
+const PIPS = { 1:[4], 2:[2,6], 3:[2,4,6], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
 const diceEl = $("dice");
 for (let i = 1; i <= 6; i++) {
   const b = document.createElement("button");
-  b.className = "die"; b.textContent = i; b.dataset.v = i;
+  b.className = "die"; b.dataset.v = i; b.setAttribute("aria-label", "Roll " + i);
+  b.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true">' +
+    PIPS[i].map(p => `<circle cx="${26 + (p % 3) * 24}" cy="${26 + Math.floor(p / 3) * 24}" r="9.5"/>`).join("") + "</svg>";
   b.addEventListener("click", () => addRoll(String(i)));
   diceEl.appendChild(b);
 }
@@ -340,7 +358,7 @@ $("copy").addEventListener("click", async () => {
     t.value = phrase; document.body.appendChild(t); t.select();
     document.execCommand("copy"); t.remove();
   }
-  $("copy").textContent = "Copied ✓";
+  $("copy").textContent = "Copied";
   setTimeout(() => ($("copy").textContent = "Copy phrase"), 1200);
 });
 
@@ -372,21 +390,25 @@ function render() {
   const have = n * BITS_PER_ROLL;
 
   $("nrolls").textContent = n;
-  $("ent").textContent = have.toFixed(1) + " bits";
-  $("need").textContent = need + " rolls";
+  $("ent").textContent = have.toFixed(1);
+  $("need").textContent = need;
+  $("entneed").textContent = entBits;
 
-  const pct = Math.min(100, (n / need) * 100);
-  $("bar").querySelector("i").style.width = pct + "%";
-  $("bar").classList.toggle("low", pct < 100);
-  $("rolllist").textContent = entry;   // exactly the string being hashed
+  const cells = Math.ceil(Math.max(need, n) / 10) * 10;
+  let tally = "";
+  for (let i = 0; i < cells; i++) {
+    const cls = i === n - 1 ? "last" : i >= need ? "extra" : "";
+    tally += `<i class="${cls}">${i < n ? rolls[i] : ""}</i>`;
+  }
+  $("tally").innerHTML = tally;
 
   /* live hash, with the slice actually used highlighted */
   const cut = entBits / 4;
   $("hash").innerHTML = '<span class="used">' + hash.slice(0, cut) + "</span>" +
     (cut < 64 ? '<span class="unused">' + hash.slice(cut) + "</span>" : "");
   $("hashnote").innerHTML =
-    `<code>SHA-256("${entry.length > 60 ? entry.slice(0, 30) + "…" + entry.slice(-20) : entry}")</code> — ` +
-    `highlighted = the <b>first ${entBits} bits</b> used as entropy for ${wordCount} words.`;
+    `<code>SHA-256("${entry.length > 60 ? entry.slice(0, 30) + "…" + entry.slice(-20) : entry}")</code>. ` +
+    `The bold part is the <b>first ${entBits} bits</b>, used as entropy for ${wordCount} words.`;
 
   /* words + entropy warning, always shown until the condition is met */
   const wordsEl = $("words");
@@ -397,7 +419,7 @@ function render() {
 
   const p = buildPhrase();
   p.words.forEach((w, i) => {
-    const d = document.createElement("div");
+    const d = document.createElement("li");
     d.className = "w";
     d.innerHTML = `<span>${i + 1}</span><b></b>`;
     d.querySelector("b").textContent = w;
@@ -414,17 +436,17 @@ function renderWarning(n, need, have, entBits) {
   const el = $("seedwarn");
 
   if (n === 0) {
-    el.className = "dbox";
+    el.className = "notice is-danger";
     el.innerHTML = `<b>Do not use this phrase.</b> With no rolls it is <code>SHA-256("")</code>, ` +
-      `a constant everyone knows — so this phrase is public. Roll the dice to make it yours.`;
+      `a constant everyone knows, so this phrase is public. Roll the dice to make it yours.`;
     return;
   }
 
   if (n < need) {
     const real = Math.round(Math.min(have, entBits));
-    el.className = "warn";
+    el.className = "notice is-weak";
     el.innerHTML =
-      `<b>⚠ Entropy not fully utilized — ${n} of ${need} rolls.</b><br>` +
+      `<b>Entropy not fully utilized: ${n} of ${need} rolls.</b><br>` +
       `These ${wordCount} words encode <b>${entBits} bits</b>, but your rolls supply only about ` +
       `<b>${real} bits</b> of real randomness. The phrase is valid and restores in any wallet; ` +
       `its true strength is just ${real} bits. ` +
@@ -432,8 +454,8 @@ function renderWarning(n, need, have, entBits) {
     return;
   }
 
-  el.className = "okbox";
-  el.innerHTML = `<b>✓ Entropy condition met.</b> ${n} rolls ≈ ${Math.round(have)} bits, ` +
+  el.className = "notice is-ok";
+  el.innerHTML = `<b>Entropy condition met.</b> ${n} rolls ≈ ${Math.round(have)} bits, ` +
     `saturating all ${entBits} bits of this ${wordCount}-word phrase.`;
 }
 
@@ -455,33 +477,32 @@ function renderDetails(p) {
 
   $("details").innerHTML = `
     <div class="step">
-      <h3>a · Entropy <em>— first ${p.entBits} bits of the SHA-256 sum</em>
-        <span class="badge">${p.entBits} bits = ${p.entHex.length} hex chars</span></h3>
+      <h3>a. Entropy: the first ${p.entBits} bits of the SHA-256 sum</h3>
       <p>${p.entBits === 128
             ? "12 words uses only the first half of the 256-bit sum."
-            : "24 words uses the whole 256-bit sum."}</p>
+            : "24 words uses the whole 256-bit sum."}
+         <span class="sum">${p.entBits} bits = ${p.entHex.length} hex chars</span></p>
       <div class="hex"><span class="used">${p.entHex}</span></div>
     </div>
 
     <div class="step">
-      <h3>b · Checksum <em>— first ${p.csLen} bits of SHA-256(entropy bytes)</em>
-        <span class="badge">${p.csLen} bits</span></h3>
+      <h3>b. Checksum: the first ${p.csLen} bits of SHA-256(entropy bytes)</h3>
       <p>Hashed over the raw ${p.entBits / 8} entropy bytes, not the hex text.</p>
-      <div class="hex"><span class="used">${p.csHex.slice(0, csCut)}</span><span class="unused">${p.csHex.slice(csCut)}</span></div>
-      <p style="margin-top:8px">First ${p.csLen} bits → <code class="bcs">${p.csBits}</code>, appended to the entropy.</p>
+      <div class="hex"><span class="used bcs">${p.csHex.slice(0, csCut)}</span><span class="unused">${p.csHex.slice(csCut)}</span></div>
+      <p style="margin-top:8px">First ${p.csLen} bits are <code class="bcs">${p.csBits}</code>, appended to the entropy.</p>
     </div>
 
     <div class="step">
-      <h3>c · Split into 11-bit groups <em>— each group is one word index (0–2047)</em>
-        <span class="badge">${p.entBits} + ${p.csLen} = ${p.all.length} bits ÷ 11 = ${p.chunks.length} words</span></h3>
+      <h3>c. Split into 11-bit groups, one word index (0 to 2047) each</h3>
+      <p><span class="sum">${p.entBits} + ${p.csLen} = ${p.all.length} bits ÷ 11 = ${p.chunks.length} words</span></p>
       <div class="tblwrap"><table>
         <thead><tr><th>#</th><th>11-bit group</th><th>Index</th><th>Word</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
       <div class="legend">
-        <i><span class="k" style="background:var(--fg)"></span>entropy bits</i>
-        <i><span class="k" style="background:var(--accent2)"></span>checksum bits</i>
-        <i>Word index → <code>BIP39_wordlist[index]</code> (2048 English words)</i>
+        <span><span class="k" style="background:var(--ink)"></span>entropy bits</span>
+        <span><span class="k" style="background:var(--pencil)"></span>checksum bits</span>
+        <span>Word index looks up <code>BIP39_wordlist[index]</code> (2048 English words)</span>
       </div>
     </div>`;
 }
@@ -489,7 +510,7 @@ function renderDetails(p) {
 /* sanity: wordlist must be exactly 2048 entries */
 if (WORDS.length !== 2048) {
   document.body.insertAdjacentHTML("afterbegin",
-    `<div class="warn" style="max-width:920px;margin:0 auto 16px">Wordlist error: ${WORDS.length} words loaded, expected 2048.</div>`);
+    `<div class="notice is-danger" style="max-width:1080px;margin:0 auto 16px">Wordlist error: ${WORDS.length} words loaded, expected 2048.</div>`);
 }
 sync();
 </script>

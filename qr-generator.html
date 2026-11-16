@@ -4,15 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Live QR Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        color-scheme: light;
-        --bg: #f3f7fb;
-        --card: #ffffff;
-        --text: #1f2937;
-        --muted: #64748b;
-        --accent: #0f766e;
-        --border: #dbe5ef;
+        color-scheme: dark;
+        --night: #0f1a2b;
+        --dock: #18273d;
+        --edge: #2b3d58;
+        --amber: #ffb347;
+        --text: #e8eef7;
+        --muted: #93a5bd;
+        --error: #ff8a7a;
+        --white: #ffffff;
       }
 
       * {
@@ -22,117 +30,255 @@
       body {
         margin: 0;
         min-height: 100vh;
-        font-family: "Segoe UI", Tahoma, sans-serif;
-        background: radial-gradient(circle at top, #e8f3ff 0%, var(--bg) 45%, #eef2f7 100%);
+        min-height: 100dvh;
+        font-family: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+        background: var(--night);
         color: var(--text);
         display: grid;
-        place-items: center;
-        padding: 24px;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        justify-items: center;
+        gap: 24px;
+        padding: 24px 20px;
       }
 
-      .app {
+      header {
         width: min(760px, 100%);
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
-        padding: 22px;
-        display: grid;
-        gap: 16px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px 24px;
+        flex-wrap: wrap;
       }
 
       h1 {
         margin: 0;
-        font-size: 1.4rem;
-      }
-
-      p {
-        margin: 0;
-        color: var(--muted);
-      }
-
-      textarea {
-        width: 100%;
-        min-height: 120px;
-        resize: vertical;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        padding: 12px 14px;
-        font: inherit;
-        line-height: 1.4;
-        outline: none;
-      }
-
-      textarea:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.15);
-      }
-
-      .row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .qr-wrap {
-        display: grid;
-        place-items: center;
-        border: 1px dashed var(--border);
-        border-radius: 12px;
-        padding: 14px;
-        min-height: 280px;
-        background: #fafcff;
-      }
-
-      canvas {
-        max-width: 100%;
-        height: auto;
+        font-size: 1.15rem;
+        font-weight: 700;
       }
 
       .status {
-        font-size: 0.9rem;
+        margin: 0;
+        font-size: 0.95rem;
         color: var(--muted);
       }
 
       .status.error {
-        color: #b91c1c;
+        color: var(--error);
+      }
+
+      .stage {
+        --frame-gap: 26px;
+        --fit: calc(100cqmin - 2 * var(--frame-gap));
+        container-type: size;
+        justify-self: stretch;
+        min-height: 240px;
+        display: grid;
+        place-items: center;
+      }
+
+      .frame {
+        position: relative;
+        padding: var(--frame-gap);
+        display: grid;
+        place-items: center;
+      }
+
+      .frame i {
+        position: absolute;
+        width: 34px;
+        height: 34px;
+        border: 0 solid var(--amber);
+      }
+
+      .frame i:nth-child(1) {
+        top: 0;
+        left: 0;
+        border-top-width: 4px;
+        border-left-width: 4px;
+        border-top-left-radius: 10px;
+      }
+
+      .frame i:nth-child(2) {
+        top: 0;
+        right: 0;
+        border-top-width: 4px;
+        border-right-width: 4px;
+        border-top-right-radius: 10px;
+      }
+
+      .frame i:nth-child(3) {
+        bottom: 0;
+        left: 0;
+        border-bottom-width: 4px;
+        border-left-width: 4px;
+        border-bottom-left-radius: 10px;
+      }
+
+      .frame i:nth-child(4) {
+        bottom: 0;
+        right: 0;
+        border-bottom-width: 4px;
+        border-right-width: 4px;
+        border-bottom-right-radius: 10px;
+      }
+
+      canvas {
+        display: block;
+        max-width: var(--fit);
+        height: auto !important;
+        border-radius: 6px;
+        background: var(--white);
+      }
+
+      .empty {
+        display: none;
+        margin: 0;
+        width: min(280px, var(--fit));
+        aspect-ratio: 1;
+        place-content: center;
+        text-align: center;
+        color: var(--muted);
+        line-height: 1.4;
+        padding: 0 28px;
+      }
+
+      .stage.is-empty canvas {
+        display: none;
+      }
+
+      .stage.is-empty .empty {
+        display: grid;
+      }
+
+      .stage.is-empty .frame i {
+        border-color: var(--edge);
+      }
+
+      @keyframes lock-on {
+        from {
+          transform: scale(1.08);
+          opacity: 0.4;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      .stage.locked .frame {
+        animation: lock-on 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .stage.locked .frame {
+          animation: none;
+        }
+      }
+
+      .dock {
+        width: min(760px, 100%);
+        background: var(--dock);
+        border: 1px solid var(--edge);
+        border-radius: 20px;
+        padding: 16px 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .dock label {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .entry {
+        display: grid;
+        gap: 8px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 76px;
+        resize: vertical;
+        border: 1px solid var(--edge);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font: inherit;
+        font-size: 1.05rem;
+        line-height: 1.4;
+        color: var(--text);
+        background: var(--night);
+        outline: none;
+      }
+
+      textarea::placeholder {
+        color: var(--muted);
+        opacity: 0.8;
+      }
+
+      textarea:focus {
+        border-color: var(--amber);
+        box-shadow: 0 0 0 3px rgba(255, 179, 71, 0.22);
+      }
+
+      .size {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 18px;
+      }
+
+      .size strong {
+        color: var(--text);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
       }
 
       input[type="range"] {
-        accent-color: var(--accent);
+        width: 100%;
+        margin: 0;
+        accent-color: var(--amber);
+      }
+
+      input[type="range"]:focus-visible {
+        outline: 2px solid var(--amber);
+        outline-offset: 6px;
+        border-radius: 4px;
       }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.2.2/build/qrcode.min.js"></script>
   </head>
   <body>
-    <main class="app">
-      <div>
-        <h1>Live QR Code Generator</h1>
-        <p>Type anything below. The QR code updates on every keystroke.</p>
+    <header>
+      <h1>QR code generator</h1>
+      <p id="status" class="status" role="status"></p>
+    </header>
+
+    <main class="stage is-empty" id="stage">
+      <div class="frame">
+        <i></i><i></i><i></i><i></i>
+        <canvas id="qrCanvas" width="280" height="280"></canvas>
+        <p class="empty">Nothing in frame. Type below and your code shows up here.</p>
       </div>
+    </main>
 
-      <label for="text">Input text or URL</label>
-      <textarea id="text" placeholder="Enter text, link, or any content..."></textarea>
-
-      <div class="row">
-        <label for="size">Image size: <strong><span id="sizeValue">280</span>px</strong></label>
+    <section class="dock">
+      <div class="entry">
+        <label for="text">Text or link</label>
+        <textarea id="text" placeholder="Paste a link or type anything"></textarea>
+      </div>
+      <div class="size">
+        <label for="size">Size <strong><span id="sizeValue">280</span> px</strong></label>
         <input id="size" type="range" min="120" max="900" value="280" step="10" />
       </div>
-
-      <div class="qr-wrap">
-        <canvas id="qrCanvas" width="280" height="280"></canvas>
-      </div>
-
-      <p id="status" class="status">Ready.</p>
-    </main>
+    </section>
 
     <script>
       const textInput = document.getElementById("text");
       const sizeInput = document.getElementById("size");
       const sizeValue = document.getElementById("sizeValue");
       const canvas = document.getElementById("qrCanvas");
+      const stage = document.getElementById("stage");
       const statusEl = document.getElementById("status");
 
       function setStatus(message, isError = false) {
@@ -140,61 +286,52 @@
         statusEl.classList.toggle("error", isError);
       }
 
-      function clearCanvas() {
-        const context = canvas.getContext("2d");
-        context.clearRect(0, 0, canvas.width, canvas.height);
+      function showEmpty() {
+        stage.classList.add("is-empty");
+        stage.classList.remove("locked");
       }
 
       function renderQR() {
-        if (typeof window.QRCode === "undefined") {
-          setStatus("Loading QR library...");
-          return;
-        }
-
         const value = textInput.value;
         const size = Number(sizeInput.value);
         sizeValue.textContent = size;
-        canvas.width = size;
-        canvas.height = size;
+
+        if (typeof window.QRCode === "undefined") {
+          showEmpty();
+          setStatus("The QR library did not load. Check your connection and reload.", true);
+          return;
+        }
 
         if (!value.trim()) {
-          clearCanvas();
-          setStatus("Type something to generate a QR code.");
+          showEmpty();
+          setStatus("Waiting for text");
           return;
         }
 
         QRCode.toCanvas(
           canvas,
           value,
-          {
-            width: size,
-            margin: 1,
-            errorCorrectionLevel: "M"
-          },
+          { width: size, margin: 1, errorCorrectionLevel: "M" },
           (error) => {
             if (error) {
-              clearCanvas();
-              setStatus("Input is too large to encode as a QR code.", true);
+              showEmpty();
+              setStatus("Too much text for one QR code. Shorten it.", true);
               return;
             }
 
-            setStatus(`Generated ${value.length} characters.`);
+            if (stage.classList.contains("is-empty")) {
+              stage.classList.remove("is-empty");
+              stage.classList.add("locked");
+            }
+            const fitted = canvas.clientWidth < size ? ", shown smaller to fit the screen" : "";
+            setStatus(`Ready to scan, ${value.length} characters${fitted}`);
           }
         );
       }
 
       textInput.addEventListener("input", renderQR);
       sizeInput.addEventListener("input", renderQR);
-
-      async function loadScript(src) {
-        return new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = src;
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
+      window.addEventListener("resize", renderQR);
 
       renderQR();
     </script>
